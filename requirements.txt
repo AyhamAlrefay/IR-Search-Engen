@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+scikit-learn
+nltk
+ir_datasets
+pandas
+pyspellchecker
