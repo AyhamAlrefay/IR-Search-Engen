@@ -3,7 +3,7 @@ import { ERROR_CODE_TYPE } from '@/helper/types/error-code-type'
 import { ElMessage } from 'element-plus'
 
 const service = axios.create({
-  baseURL: '/api',
+  baseURL: 'http://192.168.1.2:8000',
   timeout: 60000
 })
 

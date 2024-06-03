@@ -1,24 +1,25 @@
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import {ref, watch, reactive, computed} from 'vue'
 import FILE from '@/helper/utils/file'
 
+const props = defineProps(['searchContent'])
+
 const emits = defineEmits<{
-  (e: 'searchAuthor', val: string): void
+  (e: 'searchAuthor', val: string): void,
+  (e: 'search'): void
 }>()
 
+
+const search = (): void => {
+  emits('search')
+}
+
 let resultList: any = reactive({
-  val: [1,1,3,4,5,3,4,234,45,346,546,45,674,756,7,657,7,456]
+  val: []
 })
 
 let sortMethod = ref('Hot')
 
-const exportFile = (method: string): void => {
-  if (method === 'csv') {
-    FILE.exportCSV(resultList.val, 'result.csv')
-  } else if (method === 'txt') {
-    FILE.exportTxt(resultList.val, 'result.txt')
-  }
-}
 
 const deleteResult = (index: number): void => {
   resultList.val.splice(index, 1)
@@ -34,7 +35,7 @@ const searchAuthor = (author: string): void => {
 
 const filterResult: (target: any, option: any) => void = (target, option) => {
   resultList.val = []
-  const { level, key, parent } = option
+  const {level, key, parent} = option
   if (Number(level) === 1) {
     getAllResult(target)
   } else if (Number(level) === 2) {
@@ -60,13 +61,9 @@ const getAllResult = (target: any): void => {
 }
 
 const changeSortMethod = (method: any): void => {
-  if (method === 'Hot') {
+  if (method === 'Year') {
     resultList.val = resultList.val.sort(
-      (a: any, b: any) => b.citation - a.citation
-    )
-  } else if (method === 'Year') {
-    resultList.val = resultList.val.sort(
-      (a: any, b: any) => Number(b.year) - Number(a.year)
+        (a: any, b: any) => Number(b.year) - Number(a.year)
     )
   } else if (method === 'Conf') {
     console.log(11)
@@ -105,64 +102,93 @@ const pageSizeChange = (v: number): void => {
 
 const virtualList = computed(() => {
   return resultList.val.slice(
-    (page.current - 1) * page.size,
-    page.current * page.size
+      (page.current - 1) * page.size,
+      page.current * page.size
   )
 })
 
 defineExpose({
   filterResult
 })
+
+const checkedMethods = ref([]);
+
+watch(checkedMethods, (newCheckedMethods, oldCheckedMethods) => {
+  const checked = newCheckedMethods.filter(x => !oldCheckedMethods.includes(x));
+  const unchecked = oldCheckedMethods.filter(x => !newCheckedMethods.includes(x));
+
+  if (checked.length > 0) {
+    checked.forEach((x, i) => {
+      if (x === "SpellChecker") {
+        props.searchContent.spell_check = true;
+      }
+      if (x === "TFIDF") {
+        props.searchContent.tf_idf = true;
+      }
+    })
+    search()
+    console.log('Checked:', checked);
+  }
+  if (unchecked.length > 0) {
+    checked.forEach((x, i) => {
+      if (x === "SpellChecker") {
+        props.searchContent.spell_check = false;
+      }
+      if (x === "TFIDF") {
+        props.searchContent.tf_idf = false;
+      }
+    })
+    search()
+    console.log('Unchecked:', unchecked);
+  }
+});
+
+function invokeFunction() {
+  // This function will be invoked whenever the checkboxes are checked or unchecked
+  console.log('Current checked methods:', checkedMethods.value);
+}
 </script>
 
 <template>
   <el-card class="search-result-card mb-15" shadow="never">
-    <el-row v-show="resultList.val.length > 0">
-      <el-col class="align-right" :span="24">
-        <el-space wrap>
-          <el-link @click="exportFile('txt')">
-            <el-icon class="el-icon--left"><Document /></el-icon>Export txt
-          </el-link>
-          <el-link @click="exportFile('csv')">
-            <el-icon class="el-icon--left"><Collection /></el-icon>Export csv
-          </el-link>
-        </el-space>
-      </el-col>
-    </el-row>
-    <el-divider v-show="resultList.val.length > 0" />
+    <el-divider v-show="resultList.val.length > 0"/>
     <el-row
-      class="mb-10 flex flex-align-center"
-      v-show="resultList.val.length > 0"
+        class="mb-10 flex flex-align-center"
+        v-show="resultList.val.length > 0"
     >
-      <span style="padding-right: 10px">Sort By:</span>
-      <el-radio-group v-model="sortMethod" @change="changeSortMethod">
-        <el-radio label="Hot" />
-        <el-radio label="Year" />
-        <el-radio label="Conf" />
-      </el-radio-group>
+      <!--checkBox-->
+      <span style="padding-right: 10px">Filter By:</span>
+      <el-checkbox-group v-model="checkedMethods" @change="invokeFunction">
+        <el-checkbox label="SpellChecker" checked></el-checkbox>
+        <el-checkbox label="TFIDF" checked></el-checkbox>
+      </el-checkbox-group>
     </el-row>
+
     <el-space class="w-100" wrap fill direction="vertical">
       <el-card
-        shadow="never"
-        v-for="(itm, index) in virtualList"
-        :key="index"
-        class="document-itm pos-relative"
+          shadow="never"
+          v-for="(itm, index) in virtualList"
+          :key="index"
+          class="document-itm pos-relative"
       >
         <!-- Delete button -->
         <el-icon
-          class="pos-absoulte delete pointer no-select"
-          @click="deleteResult(index)"
-          ><CloseBold
-        /></el-icon>
-        <el-row class="mb-5">
+            class="pos-absoulte delete pointer no-select"
+            @click="deleteResult(index)"
+        >
+          <CloseBold
+          />
+        </el-icon>
+        <el-row style="margin-bottom: -10px">
           <el-col :span="24">
             <!-- Title -->
             <el-link
-              class="title"
-              :href="itm.url"
-              :underline="false"
-              target="_blank"
-              >{{ itm.title }}</el-link
+                class="title"
+                :href="itm.url"
+                :underline="false"
+                target="_blank"
+            >{{ itm.title }}
+            </el-link
             >
           </el-col>
         </el-row>
@@ -170,10 +196,10 @@ defineExpose({
           <el-col :span="24">
             <!-- Author -->
             <span
-              v-for="(author, authorIndex) in itm.authors"
-              :key="authorIndex"
-              @click="searchAuthor(author)"
-              class="mr-10"
+                v-for="(author, authorIndex) in itm.authors"
+                :key="authorIndex"
+                @click="searchAuthor(author)"
+                class="mr-10"
             >
               <el-link class="author">{{ author }}</el-link>
             </span>
@@ -184,51 +210,30 @@ defineExpose({
             <el-space wrap>
               <!-- Abstract -->
               <el-popover placement="top-start" :width="400" trigger="click">
-                <template #reference>
-                  <el-tag
-                    class="pointer no-select"
-                    v-show="itm.abstract"
-                    type="success"
-                  >
-                    Abstract
-                  </el-tag>
-                </template>
-                <div>
-                  <h3 class="mb-10">{{ itm.title }}</h3>
-                  <p>{{ itm.abstract }}</p>
-                </div>
               </el-popover>
               <!-- Conf -->
-              <el-tag type="warning">{{ itm.conf }}</el-tag>
-              <!-- Year -->
-              <el-tag type="danger">{{ itm.year }}</el-tag>
-              <!-- Code -->
-              <el-tag
-                class="pointer no-select"
-                v-if="itm.code !== '#'"
-                @click="jumpUrl(itm.code)"
-              >
-                CODE
-              </el-tag>
+              <el-text class="description-style">
+                {{ itm.text ? itm.text : itm.summary }}
+              </el-text>
             </el-space>
           </el-col>
         </el-row>
       </el-card>
     </el-space>
     <el-empty
-      v-show="resultList.val.length <= 0"
-      description="No Search Result"
+        v-show="resultList.val.length <= 0"
+        description="No Search Result"
     ></el-empty>
     <div class="mt-15" v-show="resultList.val.length > 0">
       <el-pagination
-        class="align-right"
-        v-model:current-page="page.current"
-        v-model:page-size="page.size"
-        :page-sizes="[10, 20, 30, 50, 100, 150, 200, 300]"
-        layout="sizes, prev, pager, next"
-        :total="resultList.val.length"
-        @size-change="pageSizeChange"
-        @current-change="pageCurrentChange"
+          class="align-right"
+          v-model:current-page="page.current"
+          v-model:page-size="page.size"
+          :page-sizes="[10, 20, 30, 50, 100, 150, 200, 300]"
+          layout="sizes, prev, pager, next"
+          :total="resultList.val.length"
+          @size-change="pageSizeChange"
+          @current-change="pageCurrentChange"
       />
     </div>
   </el-card>
@@ -237,16 +242,32 @@ defineExpose({
 <style scoped>
 .search-result-card {
 }
+
 .title {
   font-size: 18px;
 }
+
 .author {
   color: #999;
   font-size: 16px;
 }
+
 .delete {
   top: 10px;
   right: 10px;
   color: #999;
+}
+
+.description-style {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: clip;
+  background: #d6e9ee;
+  color: black;
+  border: 1px solid;
+  border-radius: 5px;
+  padding: 10px 10px 4px 10px;
 }
 </style>

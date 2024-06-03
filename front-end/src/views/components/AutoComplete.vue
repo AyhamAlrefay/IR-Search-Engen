@@ -10,7 +10,7 @@
         @keyup.enter="search"
     >
       <template #prepend>
-        <el-select v-model="searchContent.searchtype" placeholder="Select" style="width: 100px" size="large">
+        <el-select v-model="searchContent.searchtype" placeholder="Select" style="width: 110px" size="large">
           <el-option v-for="(itm, index) in SEARCH_TYPE_LIST" :key="index" :label="itm.label"
                      :value="itm.value"/>
         </el-select>
@@ -40,6 +40,7 @@
 
 <script lang="ts" setup>
 import {onMounted, ref} from 'vue'
+import {getSuggestion} from "@/helper/api/document";
 
 
 const emits = defineEmits<{
@@ -56,57 +57,51 @@ const props = defineProps(['searchContent'])
 
 // Search type list
 const SEARCH_TYPE_LIST = [
-  {label: 'Beir', value: 'title'},
-  {label: 'Clinicaltrials', value: 'author'}
+  {label: 'Beir', value: 'beir'},
+  {label: 'Clinicaltrials', value: 'clinicaltrials'}
 ]
 
-const state = ref('')
-
-interface LinkItem {
-  value: string
-  link: string
+interface SuggestionResult {
+  "query_id": string,
+  "text": string
 }
 
-const links = ref<LinkItem[]>([])
+var suggestionResult = ref<SuggestionResult[]>([])
 
-const loadAll = () => {
-  return [
-    {value: 'vue', link: 'https://github.com/vuejs/vue'},
-    {value: 'element', link: 'https://github.com/ElemeFE/element'},
-    {value: 'cooking', link: 'https://github.com/ElemeFE/cooking'},
-    {value: 'mint-ui', link: 'https://github.com/ElemeFE/mint-ui'},
-    {value: 'vuex', link: 'https://github.com/vuejs/vuex'},
-    {value: 'vue-router', link: 'https://github.com/vuejs/vue-router'},
-    {value: 'babel', link: 'https://github.com/babel/babel'},
-  ]
-}
 
 let timeout: ReturnType<typeof setTimeout>
 const querySearchAsync = (queryString: string, cb: (arg: any) => void) => {
-  const results = queryString
-      ? links.value.filter(createFilter(queryString))
-      : links.value
+  getSuggestion({page: 1}, {
+        query: queryString,
+        dataset_name: props.searchContent.searchtype.toLowerCase() + "_queries",
+        spell_check: true,
+        tf_idf: true,
+      } as SearchRequest
+  )
+      .then((res: any) => {
+
+        const suggestions = res.results.map(item => {
+          return {value: item.text, ...item};
+        });
+        cb(suggestions);
+      })
+      .catch(err => {
+        console.log(err)
+      })
+      .finally(() => {
+        // guessLoading.value = false
+      })
 
   clearTimeout(timeout)
   timeout = setTimeout(() => {
-    cb(results)
+    // cb(results)
   }, 1000 * Math.random())
-}
-const createFilter = (queryString: string) => {
-  return (restaurant: LinkItem) => {
-    return (
-        restaurant.value.toLowerCase().indexOf(queryString.toLowerCase()) === 0
-    )
-  }
 }
 
 const handleSelect = (item: Record<string, any>) => {
   console.log(item)
 }
 
-onMounted(() => {
-  links.value = loadAll()
-})
 </script>
 
 <style>

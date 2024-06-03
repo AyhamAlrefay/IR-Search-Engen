@@ -4,17 +4,31 @@ import {useDark, useToggle} from '@vueuse/core'
 import {ElLoading, ElMessage} from 'element-plus'
 import AdvancedSettingDlg from '@/views/components/AdvancedSettingDlg.vue'
 import SearchResultList from '@/views/components/SearchResultList.vue'
-import {documentSearch, guessYourLike} from '@/helper/api/document.js'
+import {documentSearch, getSuggestion} from '@/helper/api/document.js'
 import AutoComplete from "@/views/components/AutoComplete.vue";
 import LogoComponent from "@/views/components/LogoComponent.vue";
 
+
+interface SearchResult {
+  "doc_id": string,
+  "title": string,
+  "text": string,
+  "stance": string,
+  "url": string,
+  "condition": string,
+  "detailed_description": string,
+  "eligibility": string,
+  "summary": string,
+}
 
 // First entry
 let firstEntry = ref(true)
 // Query content
 let searchContent = reactive({
   query: '',
-  searchtype: 'title',
+  searchtype: 'Beir',
+  spell_check: true,
+  tf_idf: true,
   year: '',
   sp_year: '',
   sp_author: '',
@@ -64,6 +78,13 @@ let searchContent = reactive({
   ]
 })
 
+interface SearchRequest {
+  "query": string,
+  "dataset_name": string,
+  "spell_check": true,
+  "tf_idf": true
+}
+
 // Query result
 let queryResult = reactive({
   val: {}
@@ -73,11 +94,7 @@ const settingDlg = ref(null)
 // Search result component
 const searchResult = ref(null)
 
-// Handle Search
-let guessLoading = ref(false)
-let guessList = reactive({
-  val: []
-})
+
 const search = (): void => {
   if (searchContent.query === '' && searchContent.sp_author === '') {
     ElMessage.warning('Please input your keywords for search.')
@@ -89,17 +106,29 @@ const search = (): void => {
     // background: 'rgba(0, 0, 0, 0.7)',
   })
   queryResult.val = {}
-  guessList.val = []
-  documentSearch({
-    ...searchContent,
-    confs: searchContent.confs.join(',')
-  })
+  documentSearch(
+      {page: 1},
+      {
+        dataset_name: searchContent.searchtype.toLowerCase(),
+        query: searchContent.query,
+        spell_check: true,
+        tf_idf: true
+      } as SearchRequest
+      // {
+      // ...searchContent,
+      // confs: searchContent.confs.join(',')
+      // }
+  )
       .then((res: any) => {
-        const {data, msg} = res
-        if (msg === 'success') {
-          queryResult.val = data
-          handleTreeClick({level: 1})
-        }
+        // const searchResult: SearchResult[] = res.results.map((item: SearchResult) => {
+        //   return item;
+        // });
+        const searchResult: SearchResult[] = res.results as SearchResult[];
+
+        // if (msg === 'success') {
+        queryResult.val = searchResult
+        handleTreeClick({level: 1})
+        // }
       })
       .catch(err => {
         console.log(err)
@@ -108,20 +137,7 @@ const search = (): void => {
         firstEntry.value = false
         loading && loading.close()
       })
-  guessLoading.value = true
-  guessYourLike({query: searchContent.query})
-      .then((res: any) => {
-        const {data, msg} = res
-        if (msg === 'success' && data.keywords) {
-          guessList.val = data.keywords
-        }
-      })
-      .catch(err => {
-        console.log(err)
-      })
-      .finally(() => {
-        guessLoading.value = false
-      })
+
 }
 
 // Handle search author
@@ -157,7 +173,7 @@ const toggleDark = useToggle(isDark)
   <main class="full pos-relative">
     <!-- Theme Mode -->
     <div class="mb-15 mt-15 mr-15" style="text-align: end;">
-      <el-link type="primary" :icon="isDark ? 'Sunny' : 'Moon'" @click="toggleDark()">
+      <el-link type="primary" :icon="isDark ? 'Sunny' : 'Moon'" @click="toggleDark()" class="icon-size">
       </el-link>
     </div>
     <el-row justify="center" :class="['mb-15 pos-absolute', firstEntry ? 'first-entry' : 'normal']">
@@ -181,7 +197,8 @@ const toggleDark = useToggle(isDark)
     <el-row justify="center" v-show="!firstEntry">
       <el-col class="gutter-20" :xs="24" :sm="16" :md="14" :lg="10" :xl="8">
         <!-- Search result list -->
-        <SearchResultList ref="searchResult" @search-author="handleSearchAuthor"/>
+        <SearchResultList ref="searchResult" @search-author="handleSearchAuthor"
+                          v-model:search-content="searchContent" @search="search"/>
       </el-col>
     </el-row>
     <!-- Advanced setting dialog -->
@@ -223,6 +240,10 @@ const toggleDark = useToggle(isDark)
 .first-entry {
   top: calc(50% - 80px);
   transform: translateY(-50%);
+}
+
+.icon-size {
+  font-size: 1.5rem;
 }
 
 
